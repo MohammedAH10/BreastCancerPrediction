@@ -1,31 +1,27 @@
-# app.py
 import os
-import sqlite3
+import logging
 import uuid
+import sqlite3
 from datetime import datetime
 from pathlib import Path
-from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, flash
+from PIL import Image, UnidentifiedImageError
 import numpy as np
-from PIL import Image
-from tensorflow.keras.models import load_model # ignore
+from utils import load_model_from_hf, predict_image
 
 # Initialize Flask app
 app = Flask(__name__)
 app.secret_key = '443abfe9ce5b627e541aa8956523246fb3f0ae0fcc8b70ddfd95821905033c6e'
 
-# Configuration
-BASE_DIR = Path(__file__).resolve().parent
-MODEL_PATH = BASE_DIR / "saved_models" / "final_combined_model.keras"
-DB_PATH = BASE_DIR / "database" / "predictions.db"
-UPLOAD_DIR = BASE_DIR / "uploads"
+# ===== Configuration =====
+HF_MODEL_NAME = "MohammedAH/BreastCancerPrediction"  # Replace with your model name
+DB_PATH = "database/predictions.db"
+UPLOAD_DIR = "static/uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs("database", exist_ok=True)
 
-# Create required directories
-for path in [UPLOAD_DIR, DB_PATH.parent, MODEL_PATH.parent]:
-    path.mkdir(parents=True, exist_ok=True)
-
-print(f"Model path: {MODEL_PATH}")
-print(f"Database path: {DB_PATH}")
-print(f"Upload directory: {UPLOAD_DIR}")
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 
 # ===== Database Setup =====
 def init_db():
@@ -35,9 +31,12 @@ def init_db():
             CREATE TABLE IF NOT EXISTS predictions (
                 id TEXT PRIMARY KEY,
                 timestamp DATETIME,
+                age INTEGER,
+                tumor_size REAL,
                 prediction REAL,
                 confidence REAL,
-                image_path TEXT
+                image_path TEXT,
+                source TEXT
             )
         ''')
         conn.commit()
@@ -45,127 +44,118 @@ def init_db():
 # Initialize database
 init_db()
 
-# ===== Load ML Model =====
+# ===== Load Hugging Face Model =====
 try:
-    model = load_model(MODEL_PATH)
-    print(f"✅ Successfully loaded model from {MODEL_PATH}")
+    model = load_model_from_hf(HF_MODEL_NAME)
+    logging.info("Successfully loaded TensorFlow model from Hugging Face Hub")
 except Exception as e:
-    print(f"❌ Error loading model: {str(e)}")
+    logging.error(f"Error loading model: {str(e)}")
     model = None
 
 # ===== Helper Functions =====
-def preprocess_image(image: Image.Image) -> np.ndarray:
-    """Preprocess image for model prediction"""
-    # Convert to grayscale and resize
-    image = image.convert('L').resize((224, 224))
-    # Convert to numpy array and normalize
-    image_array = np.array(image) / 255.0
-    # Add batch and channel dimensions
-    return image_array[np.newaxis, ..., np.newaxis]
-
-def predict_image(image_data: np.ndarray) -> tuple:
-    """Make prediction using loaded model"""
-    if model is None:
-        raise RuntimeError("Model not loaded")
-    
-    prediction = model.predict(image_data, verbose=0)[0][0]
-    confidence = prediction if prediction > 0.5 else 1 - prediction
-    return prediction, float(confidence)
-
 def save_to_db(prediction_data: dict):
     """Save prediction to SQLite database"""
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO predictions 
-            (id, timestamp, prediction, confidence, image_path)
-            VALUES (?, ?, ?, ?, ?)
+            (id, timestamp, age, tumor_size, prediction, confidence, image_path, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             prediction_data['id'],
             prediction_data['timestamp'],
+            prediction_data['age'],
+            prediction_data['tumor_size'],
             prediction_data['prediction'],
             prediction_data['confidence'],
-            prediction_data['image_path']
+            prediction_data['image_path'],
+            prediction_data['source']
         ))
         conn.commit()
 
 # ===== Routes =====
 @app.route('/')
 def home():
-    """Render home page with upload form"""
+    """Render home page with input form"""
     return render_template('index.html')
-
-@app.route('/uploads/<filename>')
-def serve_upload(filename):
-    """Serve uploaded files"""
-    return send_from_directory(UPLOAD_DIR, filename)
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    """Handle image upload and prediction"""
-    if 'image' not in request.files:
-        flash('No image uploaded', 'error')
+    """Handle form submission and return prediction result"""
+    # Get form data
+    age = request.form.get('age')
+    tumor_size = request.form.get('tumor_size')
+    image_file = request.files.get('image')
+    
+    # Validate inputs
+    errors = []
+    if not age or not age.isdigit():
+        errors.append("Please enter a valid age")
+    if not tumor_size or not tumor_size.replace('.', '', 1).isdigit():
+        errors.append("Please enter a valid tumor size")
+    if not image_file or image_file.filename == '':
+        errors.append("Please select an image file")
+    
+    if errors:
+        for error in errors:
+            flash(error, 'danger')
         return redirect(url_for('home'))
     
-    image = request.files['image']
-    if image.filename == '':
-        flash('No selected file', 'error')
-        return redirect(url_for('home'))
+    # Generate unique ID for this prediction
+    prediction_id = str(uuid.uuid4())
+    timestamp = datetime.now().isoformat()
     
     try:
-        # Generate unique ID
-        prediction_id = str(uuid.uuid4())
-        timestamp = datetime.now()
+        # Convert inputs to proper types
+        age = int(age)
+        tumor_size = float(tumor_size)
         
         # Save uploaded file
-        filename = f"{prediction_id}_{image.filename}"
-        file_path = UPLOAD_DIR / filename
-        image.save(file_path)
-        
-        # Preprocess image
-        img = Image.open(file_path)
-        processed_image = preprocess_image(img)
+        file_ext = os.path.splitext(image_file.filename)[1]
+        file_path = Path(UPLOAD_DIR) / f"{prediction_id}{file_ext}"
+        image_file.save(file_path)
         
         # Make prediction
-        prediction, confidence = predict_image(processed_image)
+        if model is None:
+            raise Exception("Model not loaded")
+        
+        img = Image.open(file_path)
+        prediction, confidence = predict_image(model, img)
         result = "Malignant" if prediction > 0.5 else "Benign"
         
         # Prepare prediction data
         prediction_data = {
             "id": prediction_id,
-            "timestamp": timestamp.isoformat(),
+            "timestamp": timestamp,
+            "age": age,
+            "tumor_size": tumor_size,
             "prediction": float(prediction),
             "confidence": confidence,
-            "image_path": str(file_path)
+            "image_path": str(file_path),
+            "source": "web_form"
         }
         
         # Save to database
         save_to_db(prediction_data)
         
         # Prepare response
-        return render_template('result.html', 
-                               result=result,
-                               confidence=f"{confidence*100:.2f}%",
-                               prediction_id=prediction_id,
-                               image_url=f"/uploads/{filename}",
-                               now=timestamp)
+        return render_template('result.html',
+            result=result,
+            confidence=f"{confidence*100:.2f}%",
+            age=age,
+            tumor_size=tumor_size,
+            image_url=f"/{file_path}",
+            prediction_id=prediction_id
+        )
     
-    except Exception as e:
-        print(f"Prediction error: {str(e)}")
-        flash(f'Prediction error: {str(e)}', 'error')
+    except UnidentifiedImageError:
+        flash("Invalid image file format. Please upload a valid image (JPEG, PNG, etc.)", 'danger')
         return redirect(url_for('home'))
-@app.route('/history')
-def history():
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, timestamp, prediction, confidence, image_path
-            FROM predictions
-            ORDER BY timestamp DESC
-            LIMIT 20
-        """)
-        rows = cursor.fetchall()
-    return render_template("history.html", rows=rows)
+    except Exception as e:
+        logging.error(f"Prediction failed: {str(e)}")
+        flash(f"Prediction error: {str(e)}", 'danger')
+        return redirect(url_for('home'))
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
