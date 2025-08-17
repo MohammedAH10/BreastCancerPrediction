@@ -11,7 +11,7 @@ from utils import load_model_from_hf, predict_image
 
 # Initialize Flask app
 app = Flask(__name__)
-app.secret_key = '443abfe9ce5b627e541aa8956523246fb3f0ae0fcc8b70ddfd95821905033c6e'
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key')
 
 # ===== Configuration =====
 HF_MODEL_NAME = "MohammedAH/BreastCancerPrediction"  # Replace with your model name
