@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Breast Cancer Prediction</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            dark: {
+              900: '#0D0D0F',
+              800: '#1A1A1E',
+              700: '#24242A',
+            },
+            accent: {
+              blue: '#3B82F6',
+              purple: '#8B5CF6',
+              cyan: '#06B6D4',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <script>
+    function previewImage(event) {
+      const input = event.target;
+      const dropzone = document.getElementById('dropzone');
+      const preview = document.getElementById('preview');
+      const fileName = document.getElementById('file-name');
+      const clearBtn = document.getElementById('clear-btn');
+      
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          preview.src = e.target.result;
+          preview.classList.remove('hidden');
+          dropzone.classList.add('hidden');
+          fileName.textContent = input.files[0].name;
+          fileName.classList.remove('hidden');
+          clearBtn.classList.remove('hidden');
+        }
+        reader.readAsDataURL(input.files[0]);
+      }
+    }
+    function clearImage() {
+      const input = document.getElementById('dropzone-file');
+      const dropzone = document.getElementById('dropzone');
+      const preview = document.getElementById('preview');
+      const fileName = document.getElementById('file-name');
+      const clearBtn = document.getElementById('clear-btn');
+      input.value = '';
+      preview.src = '';
+      preview.classList.add('hidden');
+      dropzone.classList.remove('hidden');
+      fileName.classList.add('hidden');
+      clearBtn.classList.add('hidden');
+    }
+  </script>
+</head>
+<body class="bg-dark-900 min-h-screen text-gray-200">
+  <div class="max-w-4xl mx-auto py-12 px-4">
+    <!-- Header -->
+    <header class="text-center mb-12">
+      <h1 class="text-4xl font-bold bg-gradient-to-r from-accent-blue via-accent-purple to-accent-cyan text-transparent bg-clip-text mb-4">
+        Breast Cancer Prediction
+      </h1>
+      <p class="text-gray-400 max-w-2xl mx-auto">
+        Upload a breast medical image to analyze for potential malignant tissue.  
+        AI-powered system provides instant predictions with high accuracy.
+      </p>
+    </header>
+
+    <!-- Upload Card -->
+    <div class="bg-dark-800 rounded-xl shadow-2xl p-8 border border-dark-700">
+      <form action="/predict" method="post" enctype="multipart/form-data" class="space-y-8">
+        <!-- File Upload -->
+        <div>
+          <label class="block text-accent-blue text-lg font-medium mb-3">
+            Upload Breast Medical Image
+          </label>
+          
+          <!-- Dropzone Area -->
+          <label for="dropzone-file" id="dropzone" class="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed border-accent-purple rounded-lg cursor-pointer bg-dark-700 hover:bg-dark-600 transition-colors">
+            <div class="flex flex-col items-center justify-center pt-5 pb-6">
+              <svg class="w-10 h-10 mb-3 text-accent-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+              </svg>
+              <p class="mb-2 text-sm text-gray-400">
+                <span class="font-semibold">Click to upload</span> or drag and drop
+              </p>
+              <p class="text-xs text-gray-500">PNG, JPG, JPEG (MAX. 10MB)</p>
+            </div>
+          </label>
+          <input id="dropzone-file" name="image" type="file" class="hidden" required onchange="previewImage(event)" />
+          
+          <!-- Image Preview -->
+          <div id="preview-container" class="hidden">
+            <div class="relative w-full h-64 rounded-lg overflow-hidden border border-accent-purple mt-4">
+              <img id="preview" class="w-full h-full object-contain bg-dark-700" src="" alt="Preview">
+            </div>
+            <div class="mt-3 flex justify-between items-center">
+              <p id="file-name" class="text-sm text-gray-400 truncate max-w-xs"></p>
+              <button id="clear-btn" type="button" class="text-red-400 hover:text-red-300 text-sm font-medium" onclick="clearImage()">
+                Change Image
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="flex justify-center pt-4">
+          <button type="submit" class="px-10 py-4 bg-gradient-to-r from-accent-blue via-accent-purple to-accent-cyan text-white font-bold text-lg rounded-lg hover:opacity-90 transition-all transform hover:scale-105 shadow-lg">
+            Analyze Image
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Footer -->
+    <footer class="mt-12 text-center text-gray-500 text-sm">
+      <p>Breast Cancer Prediction System | All medical data is securely stored</p>
+    </footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prediction Result</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            dark: {
+              900: '#0D0D0F',
+              800: '#1A1A1E',
+              700: '#24242A',
+            },
+            accent: {
+              blue: '#3B82F6',
+              purple: '#8B5CF6',
+              cyan: '#06B6D4',
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-dark-900 min-h-screen text-gray-200">
+  <div class="max-w-4xl mx-auto py-12 px-4">
+    <!-- Header -->
+    <header class="text-center mb-12">
+      <h1 class="text-4xl font-bold bg-gradient-to-r from-accent-blue via-accent-purple to-accent-cyan text-transparent bg-clip-text mb-4">
+        Prediction Result
+      </h1>
+    </header>
+
+    <!-- Result Card -->
+    <div class="bg-dark-800 rounded-xl shadow-2xl p-8 border border-dark-700 mb-10">
+      <div class="flex flex-col md:flex-row gap-8">
+        
+        <!-- Image Preview -->
+        <div class="md:w-1/2">
+          <h2 class="text-xl font-bold text-accent-blue mb-4">Image Preview</h2>
+          <div class="bg-dark-700 rounded-lg overflow-hidden h-96 flex items-center justify-center">
+            <img src="{{ image_url }}" alt="Mammogram preview" class="w-full h-auto max-h-80 object-contain">
+          </div>
+        </div>
+        
+        <!-- Prediction Results -->
+        <div class="md:w-1/2">
+          <h2 class="text-xl font-bold text-accent-purple mb-4">Analysis Report</h2>
+          
+          <!-- Prediction Card -->
+          <div class="mb-6 p-6 rounded-lg border-2 
+            {% if result == 'Malignant' %}border-red-500 bg-red-900/30{% else %}border-green-500 bg-green-900/30{% endif %}">
+            <div class="flex items-center justify-between">
+              <h3 class="text-2xl font-bold">
+                Diagnosis: 
+                <span class="{% if result == 'Malignant' %}text-red-400{% else %}text-green-400{% endif %}">
+                  {{ result }}
+                </span>
+              </h3>
+              <div class="text-4xl">
+                {% if result == 'Malignant' %}⚠️{% else %}✅{% endif %}
+              </div>
+            </div>
+            <div class="mt-4">
+              <p class="text-lg">Confidence: 
+                <span class="font-bold text-white">{{ confidence }}</span>
+              </p>
+            </div>
+          </div>
+          
+          <!-- Prediction Details -->
+          <div class="bg-dark-700 rounded-lg p-5">
+            <h3 class="font-bold text-lg mb-3">Details</h3>
+            <ul class="space-y-2">
+              <li class="flex justify-between">
+                <span class="text-gray-400">Prediction ID:</span>
+                <span class="font-mono">{{ prediction_id }}</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-400">Model Version:</span>
+                <span>v2.1 (Combined Dataset)</span>
+              </li>
+              <li class="flex justify-between">
+                <span class="text-gray-400">Analysis Time:</span>
+                <span>{{ now.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+              </li>
+            </ul>
+          </div>
+          
+          <!-- Actions -->
+          <div class="mt-8 flex flex-col sm:flex-row gap-4">
+            <a href="/" class="flex-1 bg-gradient-to-r from-accent-blue via-accent-purple to-accent-cyan text-white font-bold py-3 px-6 rounded-lg text-center transition duration-300 hover:opacity-90">
+              New Analysis
+            </a>
+            <button class="flex-1 bg-dark-700 border border-accent-purple text-accent-purple font-bold py-3 px-6 rounded-lg transition duration-300 hover:bg-accent-purple/10">
+              Save Report
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Additional Info -->
+    <div class="bg-dark-800 rounded-xl p-6 border border-dark-700">
+      <h2 class="text-xl font-bold text-accent-cyan mb-4">What This Means</h2>
+      
+      {% if result == 'Malignant' %}
+      <div class="bg-red-900/20 border-l-4 border-red-500 p-4 mb-4">
+        <p class="text-red-200">
+          <span class="font-bold">Important:</span> This prediction indicates potential malignant tissue. 
+          Please consult with a medical professional for further evaluation and diagnosis.
+        </p>
+      </div>
+      {% else %}
+      <div class="bg-green-900/20 border-l-4 border-green-500 p-4 mb-4">
+        <p class="text-green-200">
+          This prediction indicates benign tissue. However, regular screenings are still recommended.
+        </p>
+      </div>
+      {% endif %}
+      
+      <div class="prose prose-invert max-w-none">
+        <h3>Next Steps</h3>
+        <ul>
+          <li>Consult with a radiologist to review the full imaging study</li>
+          <li>Schedule follow-up screenings as recommended by your healthcare provider</li>
+          <li>Maintain regular breast health checkups</li>
+        </ul>
+        
+        <h3>Disclaimer</h3>
+        <p class="text-sm text-gray-400">
+          This prediction is for informational purposes only and should not be used 
+          as a substitute for professional medical advice, diagnosis, or treatment. Always 
+          seek the advice of qualified health providers with any questions you may have 
+          regarding a medical condition.
+        </p>
+      </div>
+    </div>
+    
+    <!-- Footer -->
+    <footer class="mt-12 text-center text-gray-500 text-sm">
+      <p>Breast Cancer Prediction System | Confidential Medical Analysis</p>
+    </footer>
+  </div>
+</body>
+</html>
